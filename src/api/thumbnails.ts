@@ -1,6 +1,6 @@
 import { getBearerToken, validateJWT } from '../auth';
 import { respondWithJSON } from './json';
-import { getVideo } from '../db/videos';
+import { getVideo, updateVideo } from '../db/videos';
 import type { ApiConfig } from '../config';
 import type { BunRequest } from 'bun';
 import { BadRequestError, NotFoundError, UserForbiddenError } from './errors';
@@ -51,17 +51,29 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const formData = await req.formData();
   let imageData = formData.get('thumbnail');
   if (!(imageData instanceof File)) {
-    throw new BadRequestError('Thumbnail is missing');
+    throw new BadRequestError('Thumbnail file missing');
   }
-  const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
+  const MAX_UPLOAD_SIZE = 10 << 20;
   if (imageData.size > MAX_UPLOAD_SIZE) {
-    throw new BadRequestError('filesize to big');
+    throw new BadRequestError('Filesize is to Large for Upload');
   }
   const mediaType = imageData.type;
   const buffer = await imageData.arrayBuffer();
-  const videoMetadata = await getVideo(cfg.db, videoId);
-  if (videoMetadata?.userID != userID) {
-    throw new UserForbiddenError('This is not youre video');
+  const videoMetadata = getVideo(cfg.db, videoId);
+  if (!videoMetadata) {
+    throw new NotFoundError('Metadata could no be found');
   }
-  return respondWithJSON(200, null);
+  if (videoMetadata?.userID != userID) {
+    throw new UserForbiddenError('Wrong UserId for accessing videos');
+  }
+
+  const thumb: Thumbnail = {
+    data: buffer,
+    mediaType: mediaType,
+  };
+  videoThumbnails.set(videoId, thumb);
+  const thumbURL = `http://localhost:${cfg.port}/api/thumbnails/${videoId}`;
+  videoMetadata.thumbnailURL = thumbURL;
+  const updatedVideo = await updateVideo(cfg.db, videoMetadata);
+  return respondWithJSON(200, updatedVideo);
 }
