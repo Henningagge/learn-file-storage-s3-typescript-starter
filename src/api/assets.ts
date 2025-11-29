@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync } from 'fs';
 
-import type { ApiConfig } from "../config";
+import type { ApiConfig } from '../config';
 
 export function ensureAssetsDir(cfg: ApiConfig) {
   if (!existsSync(cfg.assetsRoot)) {
